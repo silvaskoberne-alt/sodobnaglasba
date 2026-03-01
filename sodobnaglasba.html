@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="sl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>20. stoletje – interaktivne vaje</title>
+  <style>
+    :root{
+      --bg1:#5d6bff; --bg2:#7c5cff;
+      --card:#ffffff; --text:#111827; --muted:#6b7280;
+      --accent:#6d5efc; --good:#16a34a; --bad:#ef4444;
+      --shadow: 0 18px 35px rgba(0,0,0,.10);
+      --r:18px; --r2:14px;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:linear-gradient(135deg,var(--bg1),var(--bg2));color:var(--text);padding:22px 12px}
+    .wrap{max-width:1100px;margin:0 auto}
+    header{color:#fff;text-align:center;margin:8px 0 16px}
+    h1{margin:0;font-size:clamp(26px,4vw,44px)}
+    header p{margin:10px 0 0;opacity:.9}
+    .panel{background:rgba(255,255,255,.92);border-radius:22px;box-shadow:var(--shadow);padding:16px}
+    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
+    .card{grid-column:span 12;background:#fff;border-radius:20px;border:1px solid rgba(17,24,39,.08);padding:14px}
+    @media (min-width:900px){ .card.half{grid-column:span 6} }
+    .title{display:flex;gap:10px;align-items:center;margin:0 0 8px}
+    .badge{width:40px;height:40px;border-radius:14px;display:grid;place-items:center;background:rgba(109,94,252,.12);color:var(--accent);font-size:20px}
+    h2{margin:0;font-size:20px;color:#3b2fb8}
+    .desc{margin:6px 0 12px;color:var(--muted)}
+    .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+    button{border:0;border-radius:14px;padding:10px 14px;font-weight:700;cursor:pointer;background:var(--accent);color:#fff}
+    button.secondary{background:rgba(17,24,39,.06);color:var(--text)}
+    .pill{border:2px solid rgba(17,24,39,.10);background:#fff;border-radius:999px;padding:8px 12px;cursor:pointer;user-select:none}
+    .pill.sel{border-color:rgba(109,94,252,.55);background:rgba(109,94,252,.06)}
+    .pill.ok{border-color:rgba(22,163,74,.55);background:rgba(22,163,74,.10)}
+    .pill.no{border-color:rgba(239,68,68,.55);background:rgba(239,68,68,.10)}
+    .toast{margin-top:10px;border-radius:14px;padding:10px 12px;display:none}
+    .toast.show{display:block}
+    .toast.good{background:rgba(22,163,74,.12)}
+    .toast.bad{background:rgba(239,68,68,.12)}
+    .cols{display:grid;grid-template-columns:1fr;gap:10px}
+    @media (min-width:800px){ .cols{grid-template-columns:1fr 1fr} }
+    .box{border:2px dashed rgba(17,24,39,.15);border-radius:16px;padding:10px;min-height:120px}
+    .box h3{margin:0 0 8px;font-size:14px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.04em}
+    .draggable{display:inline-block;margin:6px 6px 0 0}
+    .drag{display:inline-block;padding:8px 10px;border-radius:12px;border:2px solid rgba(17,24,39,.10);background:#fff;cursor:grab;user-select:none}
+    .drag:active{cursor:grabbing}
+    select,input[type="text"]{padding:10px 12px;border-radius:14px;border:2px solid rgba(17,24,39,.10);outline:none;min-width:220px}
+    .small{font-size:13px;color:var(--muted);margin-top:6px}
+    ol{margin:8px 0 0;padding-left:18px}
+    .order-item{display:flex;gap:10px;align-items:center;margin:6px 0}
+    .order-item span{flex:1;border:2px solid rgba(17,24,39,.10);border-radius:14px;padding:10px 12px;background:#fff}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🎼 20. stoletje</h1>
+    <p>6 interaktivnih vaj (9. razred NIS)</p>
+  </header>
+
+  <div class="panel">
+    <div class="grid" id="app"></div>
+  </div>
+</div>
+
+<script>
+/* ---------- mini engine (brez knjižnic) ---------- */
+const $ = (s, r=document) => r.querySelector(s);
+const el = (tag, props={}, kids=[]) => {
+  const n=document.createElement(tag);
+  Object.entries(props).forEach(([k,v])=>{
+    if(k==="class") n.className=v;
+    else if(k==="html") n.innerHTML=v;
+    else if(k.startsWith("on")) n.addEventListener(k.slice(2).toLowerCase(), v);
+    else n.setAttribute(k,v);
+  });
+  kids.forEach(k=>n.appendChild(k));
+  return n;
+};
+function toast(node, msg, kind){
+  node.textContent = msg;
+  node.className = "toast show " + (kind||"");
+}
+function clearToast(node){ node.className="toast"; node.textContent=""; }
+
+/* ---------- VAJA 1: multiselect ---------- */
+function multiSelectCard({title, desc, badge, items, exact=true}){
+  const sel=new Set();
+  const t = el("div",{class:"toast"});
+  const pills = items.map(it=>{
+    const p=el("div",{class:"pill", role:"button", tabindex:"0"},[
+      document.createTextNode(it.label)
+    ]);
+    const toggle=()=>{
+      if(p.dataset.locked==="1") return;
+      sel.has(it.id) ? sel.delete(it.id) : sel.add(it.id);
+      p.classList.toggle("sel", sel.has(it.id));
+      clearToast(t);
+    };
+    p.addEventListener("click", toggle);
+    p.addEventListener("keydown", (e)=>{ if(e.key==="Enter"||e.key===" ") toggle(); });
+    p.dataset.id=it.id;
+    return p;
+  });
+
+  const check=()=>{
+    const correct = new Set(items.filter(x=>x.correct).map(x=>x.id));
+    let wrong=0, miss=0;
+    pills.forEach(p=>{
+      const id=p.dataset.id;
+      const isSel=sel.has(id);
+      const isOk=correct.has(id);
+      p.classList.remove("ok","no");
+      if(isSel && isOk) p.classList.add("ok");
+      if(isSel && !isOk) p.classList.add("no");
+      if(!isSel && isOk) p.classList.add("ok"); // pokaži tudi pravilne
+      p.dataset.locked="1";
+    });
+    [...sel].forEach(id=>{ if(!correct.has(id)) wrong++; });
+    [...correct].forEach(id=>{ if(!sel.has(id)) miss++; });
+
+    if(exact){
+      if(wrong===0 && miss===0) toast(t,"✅ Odlično – vse pravilno!", "good");
+      else toast(t,`❌ Še ne. Napačno izbrano: ${wrong}, manjka: ${miss}.`, "bad");
+    }else{
+      const okChosen=[...sel].filter(id=>correct.has(id)).length;
+      toast(t,`Rezultat: ${okChosen}/${correct.size} pravilnih.`, okChosen? "good":"bad");
+    }
+  };
+  const reset=()=>{
+    sel.clear();
+    pills.forEach(p=>{ p.className="pill"; p.dataset.locked="0"; });
+    clearToast(t);
+  };
+
+  return cardShell({title, desc, badge}, [
+    el("div",{class:"row"}, pills),
+    el("div",{class:"row", style:"margin-top:12px"},[
+      el("button",{class:"secondary", onClick: reset},[document.createTextNode("Ponastavi")]),
+      el("button",{onClick: check},[document.createTextNode("Preveri")]),
+    ]),
+    t
+  ]);
+}
+
+/* ---------- VAJA 2: matching (select) ---------- */
+function matchSelectCard({title, desc, badge, pairs}){
+  const t=el("div",{class:"toast"});
+  const rows = pairs.map(p=>{
+    const s=el("select",{});
+    const opts = ["— izberi —", ...p.options];
+    opts.forEach((o,i)=> s.appendChild(el("option",{value:o},[document.createTextNode(o)])));
+    return {p, s};
+  });
+
+  const check=()=>{
+    let ok=0;
+    rows.forEach(({p,s})=>{
+      if(s.value===p.answer) ok++;
+      s.style.borderColor = (s.value===p.answer) ? "rgba(22,163,74,.55)" : "rgba(239,68,68,.55)";
+    });
+    toast(t, ok===rows.length ? "✅ Vse pravilno!" : `ℹ️ Pravilno: ${ok}/${rows.length}.`, ok===rows.length?"good":"bad");
+  };
+  const reset=()=>{
+    rows.forEach(({s})=>{ s.value="— izberi —"; s.style.borderColor="rgba(17,24,39,.10)"; });
+    clearToast(t);
+  };
+
+  return cardShell({title, desc, badge},[
+    el("div",{}, rows.map(({p,s})=> el("div",{class:"row", style:"margin:8px 0"},[
+      el("div",{style:"min-width:260px;font-weight:800"},[document.createTextNode(p.left)]),
+      s
+    ]))),
+    el("div",{class:"row", style:"margin-top:12px"},[
+      el("button",{class:"secondary", onClick: reset},[document.createTextNode("Ponastavi")]),
+      el("button",{onClick: check},[document.createTextNode("Preveri")]),
+    ]),
+    t
+  ]);
+}
+
+/* ---------- VAJA 3: order (gori/doli) ---------- */
+function orderCard({title, desc, badge, items, correctOrder}){
+  let state=[...items];
+  const t=el("div",{class:"toast"});
+  const list=el("div",{});
+  function render(){
+    list.innerHTML="";
+    state.forEach((it, idx)=>{
+      const up=el("button",{class:"secondary", onClick:()=>{ if(idx===0) return; [state[idx-1],state[idx]]=[state[idx],state[idx-1]]; render(); }},[document.createTextNode("↑")]);
+      const dn=el("button",{class:"secondary", onClick:()=>{ if(idx===state.length-1) return; [state[idx+1],state[idx]]=[state[idx],state[idx+1]]; render(); }},[document.createTextNode("↓")]);
+      up.style.padding=dn.style.padding="8px 10px";
+      list.appendChild(el("div",{class:"order-item"},[
+        up,dn,
+        el("span",{},[document.createTextNode(it)])
+      ]));
+    });
+  }
+  const check=()=>{
+    const ok = state.every((v,i)=>v===correctOrder[i]);
+    toast(t, ok ? "✅ Pravilen vrstni red!" : "❌ Vrstni red še ni pravilen. Poskusi znova.", ok?"good":"bad");
+  };
+  const reset=()=>{ state=[...items]; render(); clearToast(t); };
+
+  render();
+  return cardShell({title, desc, badge},[
+    list,
+    el("div",{class:"row", style:"margin-top:12px"},[
+      el("button",{class:"secondary", onClick: reset},[document.createTextNode("Ponastavi")]),
+      el("button",{onClick: check},[document.createTextNode("Preveri")]),
+    ]),
+    t
+  ]);
+}
+
+/* ---------- VAJA 4: drag to categories ---------- */
+function dragCategoriesCard({title, desc, badge, bins, items}){
+  const t=el("div",{class:"toast"});
+  const bank=el("div",{class:"box"});
+  bank.appendChild(el("h3",{},[document.createTextNode("Kartice")]));
+  const bankItems=el("div",{});
+  bank.appendChild(bankItems);
+
+  const binNodes = bins.map(b=>{
+    const box=el("div",{class:"box", "data-bin":b.id});
+    box.appendChild(el("h3",{},[document.createTextNode(b.label)]));
+    box.addEventListener("dragover",(e)=>e.preventDefault());
+    box.addEventListener("drop",(e)=>{
+      e.preventDefault();
+      const id=e.dataTransfer.getData("text/plain");
+      const node=document.getElementById(id);
+      if(node) box.appendChild(node);
+      clearToast(t);
+    });
+    return box;
+  });
+
+  items.forEach(it=>{
+    const d=el("div",{class:"draggable"});
+    const chip=el("div",{class:"drag", draggable:"true", id:"drag_"+it.id, "data-answer":it.bin},[
+      document.createTextNode(it.label)
+    ]);
+    chip.addEventListener("dragstart",(e)=>{ e.dataTransfer.setData("text/plain", chip.id); });
+    d.appendChild(chip);
+    bankItems.appendChild(d);
+  });
+
+  const check=()=>{
+    let ok=0, total=items.length;
+    items.forEach(it=>{
+      const node=$("#drag_"+it.id);
+      const parentBin = node.parentElement.closest(".box")?.dataset?.bin || "bank";
+      const correct = (parentBin===it.bin);
+      node.style.borderColor = correct ? "rgba(22,163,74,.55)" : "rgba(239,68,68,.55)";
+      if(correct) ok++;
+    });
+    toast(t, ok===total ? "✅ Vse pravilno razvrščeno!" : `ℹ️ Pravilno: ${ok}/${total}.`, ok===total?"good":"bad");
+  };
+  const reset=()=>{
+    items.forEach(it=>{
+      const node=$("#drag_"+it.id);
+      node.style.borderColor="rgba(17,24,39,.10)";
+      bankItems.appendChild(node);
+    });
+    clearToast(t);
+  };
+
+  const cols=el("div",{class:"cols"},[bank, ...binNodes]);
+
+  return cardShell({title, desc, badge},[
+    cols,
+    el("div",{class:"row", style:"margin-top:12px"},[
+      el("button",{class:"secondary", onClick: reset},[document.createTextNode("Ponastavi")]),
+      el("button",{onClick: check},[document.createTextNode("Preveri")]),
+    ]),
+    t
+  ]);
+}
+
+/* ---------- VAJA 5: multiple choice ---------- */
+function singleChoiceCard({title, desc, badge, question, options, answer}){
+  const t=el("div",{class:"toast"});
+  let chosen=null;
+  const pills=options.map(op=>{
+    const p=el("div",{class:"pill", role:"button", tabindex:"0"},[document.createTextNode(op)]);
+    const pick=()=>{
+      if(p.dataset.locked==="1") return;
+      chosen=op;
+      pills.forEach(x=>x.classList.remove("sel"));
+      p.classList.add("sel");
+      clearToast(t);
+    };
+    p.addEventListener("click", pick);
+    p.addEventListener("keydown",(e)=>{ if(e.key==="Enter"||e.key===" ") pick();});
+    return p;
+  });
+
+  const check=()=>{
+    if(!chosen){ toast(t,"ℹ️ Najprej izberi odgovor.", "bad"); return; }
+    pills.forEach(p=>{
+      p.dataset.locked="1";
+      const v=p.textContent;
+      p.classList.remove("ok","no");
+      if(v===answer) p.classList.add("ok");
+      if(v===chosen && v!==answer) p.classList.add("no");
+    });
+    toast(t, chosen===answer ? "✅ Prav!" : "❌ Ni prav. Poglej označeni pravilen odgovor.", chosen===answer?"good":"bad");
+  };
+  const reset=()=>{
+    chosen=null;
+    pills.forEach(p=>{ p.className="pill"; p.dataset.locked="0"; });
+    clearToast(t);
+  };
+
+  return cardShell({title, desc, badge},[
+    el("div",{style:"font-weight:800;margin:4px 0 10px"},[document.createTextNode(question)]),
+    el("div",{class:"row"}, pills),
+    el("div",{class:"row", style:"margin-top:12px"},[
+      el("button",{class:"secondary", onClick: reset},[document.createTextNode("Ponastavi")]),
+      el("button",{onClick: check},[document.createTextNode("Preveri")]),
+    ]),
+    t
+  ]);
+}
+
+/* ---------- VAJA 6: kratki vnos (cloze) ---------- */
+function textInputCard({title, desc, badge, prompt, answer, hint}){
+  const t=el("div",{class:"toast"});
+  const inp=el("input",{type:"text", placeholder:"Vpiši odgovor…"});
+  const check=()=>{
+    const v=(inp.value||"").trim().toLowerCase();
+    const a=answer.trim().toLowerCase();
+    const ok = v===a;
+    inp.style.borderColor = ok ? "rgba(22,163,74,.55)" : "rgba(239,68,68,.55)";
+    toast(t, ok ? "✅ Pravilen odgovor!" : `❌ Ni prav. Namig: ${hint||"—"}`, ok?"good":"bad");
+  };
+  const reset=()=>{ inp.value=""; inp.style.borderColor="rgba(17,24,39,.10)"; clearToast(t); };
+
+  return cardShell({title, desc, badge},[
+    el("div",{style:"font-weight:800;margin:4px 0 10px"},[document.createTextNode(prompt)]),
+    inp,
+    el("div",{class:"row", style:"margin-top:12px"},[
+      el("button",{class:"secondary", onClick: reset},[document.createTextNode("Ponastavi")]),
+      el("button",{onClick: check},[document.createTextNode("Preveri")]),
+    ]),
+    t
+  ]);
+}
+
+/* ---------- skupna ovojnica ---------- */
+function cardShell(meta, content){
+  const c=el("section",{class:"card"});
+  c.appendChild(el("div",{class:"title"},[
+    el("div",{class:"badge", "aria-hidden":"true"},[document.createTextNode(meta.badge||"🎵")]),
+    el("h2",{},[document.createTextNode(meta.title)])
+  ]));
+  c.appendChild(el("div",{class:"desc"},[document.createTextNode(meta.desc||"")]));
+  content.forEach(x=>c.appendChild(x));
+  return c;
+}
+
+/* ---------- VSEBINA: 20. stoletje (iz tvojih seznamov) ---------- */
+const app=$("#app");
+
+app.appendChild(multiSelectCard({
+  title:"Vaja 1: Izberi skladatelje 2. polovice 20. stoletja",
+  badge:"✅",
+  desc:"Klikni na imena, ki so v seznamu skladateljev 2. polovice 20. stoletja.",
+  items:[
+    {id:"messiaen", label:"Olivier Messiaen", correct:true},
+    {id:"schaeffer", label:"Pierre Schaeffer", correct:true},
+    {id:"varese", label:"Edgar Varèse", correct:true},
+    {id:"cage", label:"John Cage", correct:true},
+    {id:"stock", label:"Karlheinz Stockhausen", correct:true},
+    {id:"pend", label:"Krzysztof Penderecki", correct:true},
+    {id:"glass", label:"Philip Glass", correct:true},
+    {id:"mozart", label:"W. A. Mozart", correct:false},
+  ],
+  exact:true
+}));
+
+app.appendChild(matchSelectCard({
+  title:"Vaja 2: Poveži skladatelja z delom",
+  badge:"🔗",
+  desc:"Izberi pravilno delo za vsakega skladatelja.",
+  pairs:[
+    {left:"John Cage", answer:"4'33''", options:["4'33''","Elektronska poema","Žalostinka žrtvam Hirošime"]},
+    {left:"Philip Glass", answer:"Einstein na obali", options:["Einstein na obali","Pierrot Lunaire","Morje"]},
+    {left:"K. Stockhausen", answer:"Helikopterski godalni kvartet", options:["Helikopterski godalni kvartet","Bolero","Lan"]},
+    {left:"K. Penderecki", answer:"Žalostinka žrtvam Hirošime", options:["Žalostinka žrtvam Hirošime","Concertino","Memory"]}
+  ]
+}));
+
+app.appendChild(orderCard({
+  title:"Vaja 3: Uredi po logiki učne teme",
+  badge:"↕️",
+  desc:"Premakni pojme v smiselni vrstni red: prehod → 1. polovica → 2. polovica 20. stoletja → ustvarjanje lastne glasbe.",
+  items:["Ustvarjam lastno glasbo","1. polovica 20. stoletja","Prehod iz 19. v 20. stoletje","2. polovica 20. stoletja"],
+  correctOrder:["Prehod iz 19. v 20. stoletje","1. polovica 20. stoletja","2. polovica 20. stoletja","Ustvarjam lastno glasbo"]
+}));
+
+app.appendChild(dragCategoriesCard({
+  title:"Vaja 4: Razvrsti – akustično / elektronsko-eksperimentalno",
+  badge:"🧩",
+  desc:"Povleci kartice v pravo kategorijo (namig: nekatere skladbe so močno povezane z elektroniko/eksperimentom).",
+  bins:[
+    {id:"ak", label:"Bolj akustično (orkester/glasovi)"},
+    {id:"el", label:"Elektronsko / eksperimentalno"},
+  ],
+  items:[
+    {id:"varese", label:"Edgar Varèse – Elektronska poema", bin:"el"},
+    {id:"schaeffer", label:"Pierre Schaeffer – Simfonija za osamljenega človeka", bin:"el"},
+    {id:"cage", label:"John Cage – 4'33''", bin:"el"},
+    {id:"pend", label:"Penderecki – Žalostinka žrtvam Hirošime", bin:"ak"},
+    {id:"glass", label:"Philip Glass – Einstein na obali", bin:"ak"},
+  ]
+}));
+
+app.appendChild(singleChoiceCard({
+  title:"Vaja 5: Hitro vprašanje",
+  badge:"❓",
+  desc:"Izberi pravilen odgovor.",
+  question:"Kateri film je predlagan za ogled v tem sklopu?",
+  options:["Pianist","Amadeus","Fantazija"],
+  answer:"Pianist"
+}));
+
+app.appendChild(textInputCard({
+  title:"Vaja 6: Pojem",
+  badge:"✍️",
+  desc:"Vpiši pravilen glasbeni pojem.",
+  prompt:"Kako se imenuje glasba brez središčnega tona/tonalitete? (1 beseda)",
+  answer:"atonalna",
+  hint:"Začne se na A…"
+}));
+</script>
+</body>
+</html>
+
+
